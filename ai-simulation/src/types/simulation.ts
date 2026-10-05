@@ -1,0 +1,79 @@
+export interface Point {
+  x: number;
+  y: number;
+}
+
+export type VehicleStatus =
+  | "normal"
+  | "conflict_detected"
+  | "selected"
+  | "guided"
+  | "moving_aside"
+  | "cleared";
+
+export interface Vehicle {
+  id: string;
+  x: number;
+  y: number;
+  speed: number;
+  heading: number;
+  lane: number;
+
+  distanceToAmbulance: number;
+  routeOverlap: number;
+  headingMatch: number;
+  timeToConflict: number;
+  conflictScore: number;
+
+  status: VehicleStatus;
+  selected: boolean;
+  guided: boolean;
+}
+
+export interface Ambulance {
+  id: string;
+  x: number;
+  y: number;
+  speed: number;
+  heading: number;
+  status: "moving" | "stopped" | "completed";
+  route: Point[];
+  predictedRoute: Point[];
+}
+
+export interface DTEC {
+  id: string;
+  status: "active" | "released";
+  center: Point;
+  length: number;
+  width: number;
+  routeSegment: Point[];
+  vehicleIds: string[];
+}
+
+export interface VehicleDecision {
+  vehicleId: string;
+  conflictScore: number;
+  priority: "low" | "medium" | "high";
+  selected: boolean;
+}
+
+export interface SimulationMetrics {
+  passageDelay: number;
+  clearanceTime: number;
+  vehiclesDetected: number;
+  vehiclesSelected: number;
+  vehiclesGuided: number;
+  unnecessaryAlerts: number;
+}
+
+export type SimulationMode = "baseline" | "clearway";
+
+export interface ScenarioConfig {
+  scenario: "heavy-congestion";
+  seed: "BUILDATHON-001";
+  vehicleCount: number;
+  laneCount: number;
+  ambulance: Ambulance;
+  vehicles: Vehicle[];
+}
