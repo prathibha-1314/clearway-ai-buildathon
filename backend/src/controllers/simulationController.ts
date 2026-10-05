@@ -5,6 +5,10 @@ import {
   resetSimulation,
   stopSimulation,
 } from "../services/simulationStore";
+import {
+  startSimulationLoop,
+  stopSimulationLoop,
+} from "../services/simulationLoop";
 import { SimulationMode } from "../models/simulation";
 
 export function startSimulation(req: Request, res: Response) {
@@ -43,6 +47,8 @@ export function startSimulation(req: Request, res: Response) {
   }
 
   const state = createSimulation(mode as SimulationMode);
+
+  startSimulationLoop();
 
   return res.json({
     success: true,
@@ -84,6 +90,8 @@ export function stop(_req: Request, res: Response) {
     });
   }
 
+  stopSimulationLoop();
+
   return res.json({
     success: true,
     sessionId: state.sessionId,
@@ -92,6 +100,7 @@ export function stop(_req: Request, res: Response) {
 }
 
 export function reset(_req: Request, res: Response) {
+  stopSimulationLoop();
   resetSimulation();
 
   return res.json({
