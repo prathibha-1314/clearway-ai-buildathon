@@ -28,15 +28,19 @@ export function runDecisionEngine(
       vehicles,
     );
 
-  // 2. Calculate conflict scores and selection decisions.
+  // 2. Calculate conflict scores and current-tick
+  //    selection decisions.
   const decisions =
     calculateVehicleDecisions(
       ambulance,
       vehiclesWithFeatures,
     );
 
-  // 3. Store the AI score and selection decision
-  //    back on each vehicle.
+  // 3. Keep the vehicle view updated with the AI score
+  //    for internal/debugging use only.
+  //
+  //    Physical status, selected state, movement, speed,
+  //    and lane changes are owned by the backend simulation.
   const vehiclesWithScores: Vehicle[] =
     vehiclesWithFeatures.map((vehicle) => {
       const decision = decisions.find(
@@ -50,10 +54,6 @@ export function runDecisionEngine(
       return {
         ...vehicle,
         conflictScore: decision.conflictScore,
-        selected: decision.selected,
-        status: decision.selected
-          ? ("selected" as const)
-          : ("normal" as const),
       };
     });
 

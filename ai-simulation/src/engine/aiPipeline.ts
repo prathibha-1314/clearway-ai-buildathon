@@ -5,21 +5,11 @@ import type {
   Vehicle,
 } from "../types/simulation";
 
-import {
-  runDecisionEngine,
-} from "./decisionEngine";
+import { runDecisionEngine } from "./decisionEngine";
 
-import {
-  applyVehicleResponses,
-} from "./responseEngine";
+import { createDTECRecommendation } from "../dtec/dtecRecommendation";
 
-import {
-  createDTECRecommendation,
-} from "../dtec/dtecRecommendation";
-
-import {
-  calculateMetrics,
-} from "../metrics/metricsCalculator";
+import { calculateMetrics } from "../metrics/metricsCalculator";
 
 export interface AIPipelineResult {
   vehicles: Vehicle[];
@@ -31,35 +21,31 @@ export function runAIPipeline(
   ambulance: Ambulance,
   vehicles: Vehicle[],
 ): AIPipelineResult {
-  // 1. Calculate conflict features and AI decisions.
+  // 1. Calculate conflict features and current-tick AI decisions.
   const decisionResult = runDecisionEngine(
     ambulance,
     vehicles,
   );
 
-  // 2. Apply the AI decisions to vehicle responses.
-  const updatedVehicles = applyVehicleResponses(
+  // 2. Build DTEC from the CURRENT decisions.
+  // Do not use stale vehicle.selected state from previous ticks.
+  const dtec = createDTECRecommendation(
+    ambulance,
     decisionResult.vehicles,
     decisionResult.decisions,
   );
 
-  // 3. Build the dynamic emergency corridor.
-  const dtec = createDTECRecommendation(
-    ambulance,
-    updatedVehicles,
-  );
-
-  // 4. Calculate current simulation metrics.
+  // 3. Metrics are kept only as a local/test utility.
+  // The backend remains responsible for final simulation metrics.
   const metrics = calculateMetrics(
-    updatedVehicles,
+    decisionResult.vehicles,
     0,
     0,
   );
 
   return {
-    vehicles: updatedVehicles,
+    vehicles: decisionResult.vehicles,
     dtec,
     metrics,
   };
 }
-

@@ -4,46 +4,45 @@ export interface Point {
 }
 
 export type VehicleStatus =
-  | "normal"
-  | "conflict_detected"
-  | "selected"
-  | "guided"
-  | "moving_aside"
-  | "cleared";
+  | "NORMAL"
+  | "CONFLICT_DETECTED"
+  | "SELECTED"
+  | "GUIDED"
+  | "MOVING_ASIDE"
+  | "CLEARED";
 
 export interface Vehicle {
   id: string;
-  x: number;
-  y: number;
+  position: Point;
   speed: number;
   heading: number;
   lane: number;
 
-  distanceToAmbulance: number;
+  status: VehicleStatus;
+
+  conflictScore: number;
+  selected: boolean;
+  guided: boolean;
+
+  distanceToRoute: number;
   routeOverlap: number;
   headingMatch: number;
   timeToConflict: number;
-  conflictScore: number;
-
-  status: VehicleStatus;
-  selected: boolean;
-  guided: boolean;
 }
 
 export interface Ambulance {
   id: string;
-  x: number;
-  y: number;
+  position: Point;
   speed: number;
   heading: number;
-  status: "moving" | "stopped" | "completed";
+  status: "MOVING" | "STOPPED" | "COMPLETED";
   route: Point[];
   predictedRoute: Point[];
 }
 
 export interface DTEC {
   id: string;
-  status: "active" | "released";
+  status: "ACTIVE" | "RELEASED";
   center: Point;
   length: number;
   width: number;
@@ -54,26 +53,30 @@ export interface DTEC {
 export interface VehicleDecision {
   vehicleId: string;
   conflictScore: number;
-  priority: "low" | "medium" | "high";
+  priority: "LOW" | "MEDIUM" | "HIGH";
   selected: boolean;
 }
 
-export interface SimulationMetrics {
-  passageDelay: number;
-  clearanceTime: number;
-  vehiclesDetected: number;
-  vehiclesSelected: number;
-  vehiclesGuided: number;
-  unnecessaryAlerts: number;
-}
-
-export type SimulationMode = "baseline" | "clearway";
-
-export interface ScenarioConfig {
-  scenario: "heavy-congestion";
-  seed: "BUILDATHON-001";
-  vehicleCount: number;
-  laneCount: number;
+export interface AITickInput {
   ambulance: Ambulance;
   vehicles: Vehicle[];
+  currentDTEC: DTEC | null;
+  time: number;
+}
+
+export interface AITickOutput {
+  predictedRoute: Ambulance["predictedRoute"];
+  decisions: VehicleDecision[];
+  dtec: DTEC | null;
+}
+
+export type SimulationMode = "BASELINE" | "CLEARWAY";
+
+export interface SimulationMetrics {
+  ambulancePassageDelay: number;
+  clearanceTime: number;
+  conflictingVehicles: number;
+  selectedVehicles: number;
+  guidedVehicles: number;
+  unnecessaryAlerts: number;
 }

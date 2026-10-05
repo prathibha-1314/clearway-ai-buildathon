@@ -1,8 +1,11 @@
 import type {
   Ambulance,
-  Vehicle,
   VehicleDecision,
 } from "../types/simulation";
+
+import type {
+  ConflictFeatures,
+} from "./conflictFeatures";
 
 const SELECTION_THRESHOLD = 0.65;
 
@@ -34,20 +37,32 @@ function normalizeDistance(distance: number): number {
  *
  * Less time remaining = higher conflict.
  */
-function normalizeTimeToConflict(timeToConflict: number): number {
+function normalizeTimeToConflict(
+  timeToConflict: number,
+): number {
   if (!Number.isFinite(timeToConflict)) {
     return 0;
   }
 
-  return 1 - clamp(timeToConflict / MAX_TIME_TO_CONFLICT);
+  return 1 - clamp(
+    timeToConflict / MAX_TIME_TO_CONFLICT,
+  );
 }
 
-export function calculateConflictScore(vehicle: Vehicle): number {
-  const distanceScore = normalizeDistance(vehicle.distanceToAmbulance);
+export function calculateConflictScore(
+  vehicle: ConflictFeatures,
+): number {
+  const distanceScore = normalizeDistance(
+    vehicle.distanceToAmbulance,
+  );
 
-  const routeOverlapScore = clamp(vehicle.routeOverlap);
+  const routeOverlapScore = clamp(
+    vehicle.routeOverlap,
+  );
 
-  const headingMatchScore = clamp(vehicle.headingMatch);
+  const headingMatchScore = clamp(
+    vehicle.headingMatch,
+  );
 
   const timeToConflictScore = normalizeTimeToConflict(
     vehicle.timeToConflict,
@@ -66,21 +81,23 @@ export function getPriority(
   conflictScore: number,
 ): VehicleDecision["priority"] {
   if (conflictScore >= 0.8) {
-    return "high";
+    return "HIGH";
   }
 
   if (conflictScore >= 0.5) {
-    return "medium";
+    return "MEDIUM";
   }
 
-  return "low";
+  return "LOW";
 }
 
 export function createVehicleDecision(
-  vehicle: Vehicle,
+  vehicle: ConflictFeatures,
   _ambulance: Ambulance,
 ): VehicleDecision {
-  const conflictScore = calculateConflictScore(vehicle);
+  const conflictScore = calculateConflictScore(
+    vehicle,
+  );
 
   return {
     vehicleId: vehicle.id,
@@ -92,9 +109,12 @@ export function createVehicleDecision(
 
 export function calculateVehicleDecisions(
   ambulance: Ambulance,
-  vehicles: Vehicle[],
+  vehicles: ConflictFeatures[],
 ): VehicleDecision[] {
   return vehicles.map((vehicle) =>
-    createVehicleDecision(vehicle, ambulance),
+    createVehicleDecision(
+      vehicle,
+      ambulance,
+    ),
   );
 }

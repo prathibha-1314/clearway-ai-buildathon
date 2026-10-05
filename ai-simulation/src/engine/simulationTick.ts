@@ -11,38 +11,21 @@ export interface SimulationTickResult {
   dtec: ReturnType<typeof runAIPipeline>["dtec"];
 }
 
-function moveAmbulance(
-  ambulance: Ambulance,
-  deltaTime: number,
-): Ambulance {
-  const distanceTravelled =
-    ambulance.speed * deltaTime;
-
-  return {
-    ...ambulance,
-    x: ambulance.x + distanceTravelled,
-  };
-}
-
 export function runSimulationTick(
   ambulance: Ambulance,
   vehicles: Vehicle[],
-  deltaTime: number,
+  _deltaTime: number,
 ): SimulationTickResult {
-  // Move the ambulance according to elapsed simulation time.
-  const updatedAmbulance = moveAmbulance(
-    ambulance,
-    deltaTime,
-  );
-
-  // Re-run the AI against the new ambulance position.
+  // Physical movement is owned by the backend simulation.
+  // This compatibility wrapper only evaluates the AI
+  // against the state supplied to it.
   const aiResult = runAIPipeline(
-    updatedAmbulance,
+    ambulance,
     vehicles,
   );
 
   return {
-    ambulance: updatedAmbulance,
+    ambulance,
     vehicles: aiResult.vehicles,
     dtec: aiResult.dtec,
   };

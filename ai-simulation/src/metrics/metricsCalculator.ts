@@ -5,18 +5,18 @@ import type {
 
 export function calculateMetrics(
   vehicles: Vehicle[],
-  passageDelay: number,
+  ambulancePassageDelay: number,
   clearanceTime: number,
 ): SimulationMetrics {
-  const vehiclesDetected = vehicles.filter(
-    (vehicle) => vehicle.status !== "normal",
+  const conflictingVehicles = vehicles.filter(
+    (vehicle) => vehicle.status !== "NORMAL",
   ).length;
 
-  const vehiclesSelected = vehicles.filter(
+  const selectedVehicles = vehicles.filter(
     (vehicle) => vehicle.selected,
   ).length;
 
-  const vehiclesGuided = vehicles.filter(
+  const guidedVehicles = vehicles.filter(
     (vehicle) => vehicle.guided,
   ).length;
 
@@ -27,11 +27,11 @@ export function calculateMetrics(
   ).length;
 
   return {
-    passageDelay,
+    ambulancePassageDelay,
     clearanceTime,
-    vehiclesDetected,
-    vehiclesSelected,
-    vehiclesGuided,
+    conflictingVehicles,
+    selectedVehicles,
+    guidedVehicles,
     unnecessaryAlerts,
   };
 }

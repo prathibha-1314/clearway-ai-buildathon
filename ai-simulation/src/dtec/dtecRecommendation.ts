@@ -3,6 +3,7 @@ import type {
   DTEC,
   Point,
   Vehicle,
+  VehicleDecision,
 } from "../types/simulation";
 
 function calculateCenter(
@@ -11,15 +12,15 @@ function calculateCenter(
 ): Point {
   if (vehicles.length === 0) {
     return {
-      x: ambulance.x,
-      y: ambulance.y,
+      x: ambulance.position.x,
+      y: ambulance.position.y,
     };
   }
 
   const total = vehicles.reduce(
     (sum, vehicle) => ({
-      x: sum.x + vehicle.x,
-      y: sum.y + vehicle.y,
+      x: sum.x + vehicle.position.x,
+      y: sum.y + vehicle.position.y,
     }),
     { x: 0, y: 0 },
   );
@@ -33,9 +34,16 @@ function calculateCenter(
 export function createDTECRecommendation(
   ambulance: Ambulance,
   vehicles: Vehicle[],
+  decisions: VehicleDecision[],
 ): DTEC | null {
-  const selectedVehicles = vehicles.filter(
-    (vehicle) => vehicle.selected,
+  const selectedIds = new Set(
+    decisions
+      .filter((decision) => decision.selected)
+      .map((decision) => decision.vehicleId),
+  );
+
+  const selectedVehicles = vehicles.filter((vehicle) =>
+    selectedIds.has(vehicle.id),
   );
 
   if (selectedVehicles.length === 0) {
@@ -49,7 +57,7 @@ export function createDTECRecommendation(
 
   return {
     id: "DTEC-001",
-    status: "active",
+    status: "ACTIVE",
     center,
     length: 30,
     width: 12,

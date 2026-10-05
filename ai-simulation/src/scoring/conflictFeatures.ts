@@ -1,5 +1,9 @@
 import type { Ambulance, Vehicle } from "../types/simulation";
 
+export type ConflictFeatures = Vehicle & {
+  distanceToAmbulance: number;
+};
+
 function clamp(value: number, min = 0, max = 1): number {
   return Math.min(Math.max(value, min), max);
 }
@@ -13,16 +17,31 @@ function distance(
   return Math.sqrt((x2 - x1) ** 2 + (y2 - y1) ** 2);
 }
 
+function calculateRouteDistance(
+  ambulance: Ambulance,
+  vehicle: Vehicle,
+): number {
+  return ambulance.route.reduce((closest, point) => {
+    return Math.min(
+      closest,
+      distance(
+        vehicle.position.x,
+        vehicle.position.y,
+        point.x,
+        point.y,
+      ),
+    );
+  }, Infinity);
+}
+
 function calculateRouteOverlap(
   ambulance: Ambulance,
   vehicle: Vehicle,
 ): number {
-  const distanceToRoute = ambulance.route.reduce((closest, point) => {
-    return Math.min(
-      closest,
-      distance(vehicle.x, vehicle.y, point.x, point.y),
-    );
-  }, Infinity);
+  const distanceToRoute = calculateRouteDistance(
+    ambulance,
+    vehicle,
+  );
 
   // Vehicles close to the ambulance route have greater route overlap.
   return clamp(1 - distanceToRoute / 30);
@@ -32,8 +51,14 @@ function calculateHeadingMatch(
   ambulance: Ambulance,
   vehicle: Vehicle,
 ): number {
-  const difference = Math.abs(ambulance.heading - vehicle.heading);
-  const normalizedDifference = Math.min(difference, 360 - difference);
+  const difference = Math.abs(
+    ambulance.heading - vehicle.heading,
+  );
+
+  const normalizedDifference = Math.min(
+    difference,
+    360 - difference,
+  );
 
   return clamp(1 - normalizedDifference / 180);
 }
@@ -41,14 +66,8 @@ function calculateHeadingMatch(
 function calculateTimeToConflict(
   ambulance: Ambulance,
   vehicle: Vehicle,
+  distanceToAmbulance: number,
 ): number {
-  const distanceToAmbulance = distance(
-    ambulance.x,
-    ambulance.y,
-    vehicle.x,
-    vehicle.y,
-  );
-
   const relativeSpeed = Math.max(
     ambulance.speed - vehicle.speed,
     0.1,
@@ -60,12 +79,17 @@ function calculateTimeToConflict(
 export function calculateConflictFeatures(
   ambulance: Ambulance,
   vehicle: Vehicle,
-): Vehicle {
+): ConflictFeatures {
   const distanceToAmbulance = distance(
-    ambulance.x,
-    ambulance.y,
-    vehicle.x,
-    vehicle.y,
+    ambulance.position.x,
+    ambulance.position.y,
+    vehicle.position.x,
+    vehicle.position.y,
+  );
+
+  const distanceToRoute = calculateRouteDistance(
+    ambulance,
+    vehicle,
   );
 
   const routeOverlap = calculateRouteOverlap(
@@ -81,23 +105,37 @@ export function calculateConflictFeatures(
   const timeToConflict = calculateTimeToConflict(
     ambulance,
     vehicle,
+    distanceToAmbulance,
   );
 
   return {
     ...vehicle,
-    distanceToAmbulance: Number(distanceToAmbulance.toFixed(3)),
-    routeOverlap: Number(routeOverlap.toFixed(3)),
-    headingMatch: Number(headingMatch.toFixed(3)),
-    timeToConflict: Number(timeToConflict.toFixed(3)),
+    distanceToRoute: Number(
+      distanceToRoute.toFixed(3),
+    ),
+    routeOverlap: Number(
+      routeOverlap.toFixed(3),
+    ),
+    headingMatch: Number(
+      headingMatch.toFixed(3),
+    ),
+    timeToConflict: Number(
+      timeToConflict.toFixed(3),
+    ),
+    distanceToAmbulance: Number(
+      distanceToAmbulance.toFixed(3),
+    ),
   };
 }
 
 export function calculateAllConflictFeatures(
   ambulance: Ambulance,
   vehicles: Vehicle[],
-): Vehicle[] {
+): ConflictFeatures[] {
   return vehicles.map((vehicle) =>
-    calculateConflictFeatures(ambulance, vehicle),
+    calculateConflictFeatures(
+      ambulance,
+      vehicle,
+    ),
   );
 }
-
