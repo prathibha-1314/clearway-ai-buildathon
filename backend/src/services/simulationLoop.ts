@@ -72,28 +72,11 @@ function calculateResults(
   sessionId: string,
   mode: "BASELINE" | "CLEARWAY",
   time: number,
-  vehicles: NonNullable<
-    ReturnType<typeof getSimulationState>
-  >["vehicles"]
+  conflictingVehicleIds: Set<string>,
+  selectedVehicleIds: Set<string>,
+  guidedVehicleIds: Set<string>,
+  clearanceTime: number
 ) {
-  const conflictingVehicles =
-    vehicles.filter(
-      (vehicle) =>
-        vehicle.conflictScore >= 0.65
-    ).length;
-
-  const selectedVehicles =
-    vehicles.filter(
-      (vehicle) => vehicle.guided
-    ).length;
-
-  const guidedVehicles =
-    vehicles.filter(
-      (vehicle) =>
-        vehicle.guided &&
-        vehicle.status === "CLEARED"
-    ).length;
-
   const ambulancePassageDelay =
     Math.max(
       0,
@@ -104,22 +87,25 @@ function calculateResults(
       )
     );
 
-  const clearanceTime =
-    mode === "CLEARWAY" &&
-    guidedVehicles > 0
-      ? Number(time.toFixed(2))
-      : 0;
-
   return {
     sessionId,
     mode,
 
     ambulancePassageDelay,
-    clearanceTime,
 
-    conflictingVehicles,
-    selectedVehicles,
-    guidedVehicles,
+    clearanceTime:
+      mode === "CLEARWAY"
+        ? Number(clearanceTime.toFixed(2))
+        : 0,
+
+    conflictingVehicles:
+      conflictingVehicleIds.size,
+
+    selectedVehicles:
+      selectedVehicleIds.size,
+
+    guidedVehicles:
+      guidedVehicleIds.size,
 
     unnecessaryAlerts: 0,
 
@@ -133,6 +119,20 @@ export function startSimulationLoop(): void {
     return;
   }
 
+  const conflictingVehicleIds =
+    new Set<string>();
+
+  const selectedVehicleIds =
+    new Set<string>();
+
+  const guidedVehicleIds =
+    new Set<string>();
+
+  let clearanceTime: number | null =
+    null;
+
+  let guidanceStarted = false;
+
   interval = setInterval(() => {
     const state = getSimulationState();
 
@@ -145,15 +145,12 @@ export function startSimulationLoop(): void {
     }
 
     const deltaTime = TICK_MS / 1000;
+
     const nextTime =
       state.time + deltaTime;
 
     let ambulanceSpeed =
       AMBULANCE_SPEED;
-
-    // ---------------------------------------------------------
-    // BASELINE
-    // ---------------------------------------------------------
 
     if (state.mode === "BASELINE") {
       const blocker =
@@ -179,10 +176,6 @@ export function startSimulationLoop(): void {
       }
     }
 
-    // ---------------------------------------------------------
-    // MOVE AMBULANCE
-    // ---------------------------------------------------------
-
     const ambulance = {
       ...state.ambulance,
 
@@ -197,10 +190,6 @@ export function startSimulationLoop(): void {
             deltaTime,
       },
     };
-
-    // ---------------------------------------------------------
-    // MOVE VEHICLES
-    // ---------------------------------------------------------
 
     let vehicles =
       state.vehicles.map(
@@ -224,10 +213,6 @@ export function startSimulationLoop(): void {
 
     let nextDTEC = null;
 
-    // ---------------------------------------------------------
-    // CLEARWAY
-    // ---------------------------------------------------------
-
     if (state.mode === "CLEARWAY") {
       const aiOutput = runAITick({
         ambulance,
@@ -235,6 +220,22 @@ export function startSimulationLoop(): void {
         currentDTEC: state.dtec,
         time: nextTime,
       });
+
+      for (const decision of aiOutput.decisions) {
+        if (
+          decision.conflictScore >= 0.65
+        ) {
+          conflictingVehicleIds.add(
+            decision.vehicleId
+          );
+        }
+
+        if (decision.selected) {
+          selectedVehicleIds.add(
+            decision.vehicleId
+          );
+        }
+      }
 
       vehicles = vehicles.map(
         (vehicle) => {
@@ -260,6 +261,12 @@ export function startSimulationLoop(): void {
           }
 
           if (decision.selected) {
+            guidanceStarted = true;
+
+            guidedVehicleIds.add(
+              vehicle.id
+            );
+
             return {
               ...vehicle,
 
@@ -287,10 +294,6 @@ export function startSimulationLoop(): void {
           };
         }
       );
-
-      // -------------------------------------------------------
-      // MOVE SELECTED VEHICLES ASIDE
-      // -------------------------------------------------------
 
       vehicles = vehicles.map(
         (vehicle) => {
@@ -371,10 +374,6 @@ export function startSimulationLoop(): void {
         }
       );
 
-      // -------------------------------------------------------
-      // NOTIFICATIONS
-      // -------------------------------------------------------
-
       for (const vehicle of vehicles) {
         const alreadyNotified =
           notifications.some(
@@ -403,10 +402,6 @@ export function startSimulationLoop(): void {
         }
       }
 
-      // -------------------------------------------------------
-      // DTEC
-      // -------------------------------------------------------
-
       const activeVehicles =
         vehicles.filter(
           (vehicle) =>
@@ -414,6 +409,14 @@ export function startSimulationLoop(): void {
             vehicle.status !==
               "CLEARED"
         );
+
+      if (
+        guidanceStarted &&
+        activeVehicles.length === 0 &&
+        clearanceTime === null
+      ) {
+        clearanceTime = nextTime;
+      }
 
       if (
         activeVehicles.length > 0
@@ -449,10 +452,6 @@ export function startSimulationLoop(): void {
       }
     }
 
-    // ---------------------------------------------------------
-    // AMBULANCE COMPLETION
-    // ---------------------------------------------------------
-
     const ambulanceCompleted =
       ambulance.position.x >= END_X;
 
@@ -464,17 +463,16 @@ export function startSimulationLoop(): void {
         : ("MOVING" as const),
     };
 
-    // ---------------------------------------------------------
-    // COMPLETE
-    // ---------------------------------------------------------
-
     if (ambulanceCompleted) {
       const results =
         calculateResults(
           state.sessionId,
           state.mode,
           nextTime,
-          vehicles
+          conflictingVehicleIds,
+          selectedVehicleIds,
+          guidedVehicleIds,
+          clearanceTime ?? 0
         );
 
       updateSimulationState({
@@ -498,10 +496,6 @@ export function startSimulationLoop(): void {
 
       return;
     }
-
-    // ---------------------------------------------------------
-    // STATUS
-    // ---------------------------------------------------------
 
     let nextStatus =
       state.status;

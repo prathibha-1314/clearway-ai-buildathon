@@ -16,6 +16,10 @@ const resultsHistory = new Map<
   SimulationResults
 >();
 
+let latestBaselineResults:
+  | SimulationResults
+  | null = null;
+
 export function createSimulation(
   mode: SimulationMode
 ): SimulationState {
@@ -88,12 +92,51 @@ export function setResults(
     return;
   }
 
-  state.results = results;
+  let finalResults = {
+    ...results,
+  };
+
+  if (results.mode === "BASELINE") {
+    latestBaselineResults = {
+      ...results,
+    };
+  }
+
+  if (
+    results.mode === "CLEARWAY" &&
+    latestBaselineResults
+  ) {
+    const passageDelayDifference =
+      latestBaselineResults.ambulancePassageDelay -
+      results.ambulancePassageDelay;
+
+    const improvementPercent =
+      latestBaselineResults.ambulancePassageDelay >
+      0
+        ? (passageDelayDifference /
+            latestBaselineResults.ambulancePassageDelay) *
+          100
+        : 0;
+
+    finalResults = {
+      ...results,
+
+      passageDelayDifference: Number(
+        passageDelayDifference.toFixed(2)
+      ),
+
+      improvementPercent: Number(
+        improvementPercent.toFixed(1)
+      ),
+    };
+  }
+
+  state.results = finalResults;
   state.status = "COMPLETED";
 
   resultsHistory.set(
-    results.sessionId,
-    results
+    finalResults.sessionId,
+    finalResults
   );
 }
 
@@ -103,6 +146,12 @@ export function getResults(
   return (
     resultsHistory.get(sessionId) ?? null
   );
+}
+
+export function getLatestBaselineResults():
+  | SimulationResults
+  | null {
+  return latestBaselineResults;
 }
 
 export function resetSimulation(): void {
