@@ -1,6 +1,8 @@
 import express from "express";
 import cors from "cors";
+
 import simulationRoutes from "./routes/simulationRoutes";
+import resultsRoutes from "./routes/resultsRoutes";
 
 const app = express();
 
@@ -20,6 +22,14 @@ app.get("/health", (_req, res) => {
   });
 });
 
-app.use("/api/simulation", simulationRoutes);
+app.use(
+  "/api/simulation",
+  simulationRoutes
+);
+
+app.use(
+  "/api/results",
+  resultsRoutes
+);
 
 export default app;

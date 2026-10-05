@@ -11,15 +11,23 @@ let state: SimulationState | null = null;
 
 let sessionCounter = 0;
 
+const resultsHistory = new Map<
+  string,
+  SimulationResults
+>();
+
 export function createSimulation(
   mode: SimulationMode
 ): SimulationState {
   sessionCounter += 1;
 
-  const { ambulance, vehicles } = createInitialScenario();
+  const { ambulance, vehicles } =
+    createInitialScenario();
 
   state = {
-    sessionId: `SESSION-${String(sessionCounter).padStart(3, "0")}`,
+    sessionId: `SESSION-${String(
+      sessionCounter
+    ).padStart(3, "0")}`,
     mode,
     status: "RUNNING",
     time: 0,
@@ -36,7 +44,9 @@ export function createSimulation(
   return state;
 }
 
-export function getSimulationState(): SimulationState | null {
+export function getSimulationState():
+  | SimulationState
+  | null {
   return state;
 }
 
@@ -55,7 +65,9 @@ export function updateSimulationState(
   return state;
 }
 
-export function setDTEC(dtec: DTEC | null): void {
+export function setDTEC(
+  dtec: DTEC | null
+): void {
   if (state) {
     state.dtec = dtec;
   }
@@ -72,18 +84,38 @@ export function setNotifications(
 export function setResults(
   results: SimulationResults
 ): void {
-  if (state) {
-    state.results = results;
-    state.status = "COMPLETED";
+  if (!state) {
+    return;
   }
+
+  state.results = results;
+  state.status = "COMPLETED";
+
+  resultsHistory.set(
+    results.sessionId,
+    results
+  );
+}
+
+export function getResults(
+  sessionId: string
+): SimulationResults | null {
+  return (
+    resultsHistory.get(sessionId) ?? null
+  );
 }
 
 export function resetSimulation(): void {
   state = null;
 }
 
-export function stopSimulation(): SimulationState | null {
-  if (state && state.status !== "COMPLETED") {
+export function stopSimulation():
+  | SimulationState
+  | null {
+  if (
+    state &&
+    state.status !== "COMPLETED"
+  ) {
     state.status = "COMPLETED";
   }
 
