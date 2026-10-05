@@ -1,4 +1,4 @@
-import { runAITick } from "../engine/aiEngine";
+import { runAITick } from "../../../ai-simulation/src/engine/aiTick";
 import {
   getSimulationState,
   setResults,
@@ -152,6 +152,13 @@ export function startSimulationLoop(): void {
     let ambulanceSpeed =
       AMBULANCE_SPEED;
 
+    /*
+     * BASELINE
+     *
+     * The ambulance has no ClearWay coordination.
+     * It simply slows down when it gets too close
+     * to a blocking vehicle in the same lane.
+     */
     if (state.mode === "BASELINE") {
       const blocker =
         findBlockingVehicle(
@@ -176,6 +183,12 @@ export function startSimulationLoop(): void {
       }
     }
 
+    /*
+     * Move ambulance.
+     *
+     * Physical movement remains owned by the backend.
+     * The AI never mutates the ambulance.
+     */
     const ambulance = {
       ...state.ambulance,
 
@@ -191,6 +204,12 @@ export function startSimulationLoop(): void {
       },
     };
 
+    /*
+     * Move all vehicles normally first.
+     *
+     * AI only decides which vehicles should
+     * receive guidance.
+     */
     let vehicles =
       state.vehicles.map(
         (vehicle) => ({
@@ -213,14 +232,29 @@ export function startSimulationLoop(): void {
 
     let nextDTEC = null;
 
+    /*
+     * CLEARWAY
+     *
+     * The finalized AI module is called exactly
+     * once per simulation tick.
+     */
     if (state.mode === "CLEARWAY") {
-      const aiOutput = runAITick({
+      const aiInput = {
         ambulance,
         vehicles,
         currentDTEC: state.dtec,
         time: nextTime,
-      });
+      };
 
+      const aiOutput =
+        runAITick(aiInput);
+
+      /*
+       * Record AI decisions for metrics.
+       *
+       * The backend does not ask the AI to mutate
+       * physical state.
+       */
       for (const decision of aiOutput.decisions) {
         if (
           decision.conflictScore >= 0.65
@@ -237,6 +271,10 @@ export function startSimulationLoop(): void {
         }
       }
 
+      /*
+       * Apply AI decisions to backend-owned
+       * vehicle state.
+       */
       vehicles = vehicles.map(
         (vehicle) => {
           const decision =
@@ -250,16 +288,25 @@ export function startSimulationLoop(): void {
             return vehicle;
           }
 
+          /*
+           * A vehicle that already cleared the
+           * ambulance corridor remains cleared.
+           */
           if (
             vehicle.status ===
             "CLEARED"
           ) {
             return {
               ...vehicle,
+              conflictScore:
+                decision.conflictScore,
               selected: false,
             };
           }
 
+          /*
+           * AI selected this vehicle for guidance.
+           */
           if (decision.selected) {
             guidanceStarted = true;
 
@@ -284,6 +331,9 @@ export function startSimulationLoop(): void {
             };
           }
 
+          /*
+           * Vehicle is not selected this tick.
+           */
           return {
             ...vehicle,
 
@@ -295,6 +345,12 @@ export function startSimulationLoop(): void {
         }
       );
 
+      /*
+       * Move guided vehicles aside.
+       *
+       * This is backend simulation behavior,
+       * not AI behavior.
+       */
       vehicles = vehicles.map(
         (vehicle) => {
           if (
@@ -314,6 +370,9 @@ export function startSimulationLoop(): void {
           const difference =
             targetY - currentY;
 
+          /*
+           * Vehicle has reached its target lane.
+           */
           if (
             Math.abs(difference) <= 2
           ) {
@@ -374,6 +433,10 @@ export function startSimulationLoop(): void {
         }
       );
 
+      /*
+       * Create one emergency guidance notification
+       * for each guided vehicle.
+       */
       for (const vehicle of vehicles) {
         const alreadyNotified =
           notifications.some(
@@ -402,6 +465,10 @@ export function startSimulationLoop(): void {
         }
       }
 
+      /*
+       * Vehicles still actively moving aside
+       * are represented by the active DTEC.
+       */
       const activeVehicles =
         vehicles.filter(
           (vehicle) =>
@@ -410,6 +477,10 @@ export function startSimulationLoop(): void {
               "CLEARED"
         );
 
+      /*
+       * Record the time at which all guided
+       * vehicles finished clearing.
+       */
       if (
         guidanceStarted &&
         activeVehicles.length === 0 &&
@@ -418,6 +489,10 @@ export function startSimulationLoop(): void {
         clearanceTime = nextTime;
       }
 
+      /*
+       * DTEC is generated from the vehicles
+       * currently active in the corridor.
+       */
       if (
         activeVehicles.length > 0
       ) {
@@ -452,6 +527,10 @@ export function startSimulationLoop(): void {
       }
     }
 
+    /*
+     * Check whether ambulance has reached
+     * the end of the emergency route.
+     */
     const ambulanceCompleted =
       ambulance.position.x >= END_X;
 
@@ -463,6 +542,9 @@ export function startSimulationLoop(): void {
         : ("MOVING" as const),
     };
 
+    /*
+     * Finish simulation.
+     */
     if (ambulanceCompleted) {
       const results =
         calculateResults(
@@ -497,40 +579,44 @@ export function startSimulationLoop(): void {
       return;
     }
 
-    let nextStatus =
-      state.status;
+    /*
+     * Determine the visible simulation phase.
+     */
+    let nextStatus:
+      | "RUNNING"
+      | "ANALYZING"
+      | "DTEC_ACTIVE"
+      | "GUIDANCE"
+      | "AMBULANCE_PASSING" =
+      "RUNNING";
 
-    if (
-      state.mode === "CLEARWAY"
-    ) {
+    if (state.mode === "CLEARWAY") {
       if (nextDTEC) {
-        nextStatus =
-          "DTEC_ACTIVE";
-      } else if (
-        finalAmbulance.position.x >
-        400
-      ) {
-        nextStatus =
-          "AMBULANCE_PASSING";
+        nextStatus = "DTEC_ACTIVE";
+      } else if (guidanceStarted) {
+        nextStatus = "GUIDANCE";
       } else {
-        nextStatus = "RUNNING";
+        nextStatus = "ANALYZING";
       }
-    } else {
+
+      /*
+       * Once the ambulance is close to the end
+       * of the route, expose the passing phase.
+       */
       if (
-        finalAmbulance.position.x >
-        400
+        ambulance.position.x >=
+        END_X - 80
       ) {
         nextStatus =
           "AMBULANCE_PASSING";
-      } else {
-        nextStatus = "RUNNING";
       }
     }
 
+    /*
+     * Publish the next complete simulation state.
+     */
     updateSimulationState({
       time: nextTime,
-
-      status: nextStatus,
 
       ambulance:
         finalAmbulance,
@@ -540,6 +626,8 @@ export function startSimulationLoop(): void {
       dtec: nextDTEC,
 
       notifications,
+
+      status: nextStatus,
     });
   }, TICK_MS);
 }
